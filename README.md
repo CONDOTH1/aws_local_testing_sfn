@@ -9,6 +9,7 @@ AWS infrastructure locally with defined test cases.
 
 - [Description](#description)
 - [Utilities Setup](#utilities_setup)
+- [Running Tests](#running_tests)
 - [Reference Documentation](#reference_documentation)
 
 ## Description:

@@ -112,7 +112,7 @@ create_queue(os.getenv('UTILITIES_QUEUE_NAME'))
 create_queue(os.getenv('LOCAL_APP_QUEUE_NAME'))
 create_queue(os.getenv('RUN_TESTS_QUEUE_NAME'))
 create_secrets(
-    secret_name="/local/withintelligence/sec",
+    secret_name=os.getenv('SECRET_NAME'),
     secrets={"SEC_API_KEY": os.getenv('SEC_API_KEY')},
 )
 create_s3()
