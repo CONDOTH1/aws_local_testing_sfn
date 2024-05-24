@@ -1,0 +1,101 @@
+services:
+  step-functions:
+    image: amazon/aws-stepfunctions-local:latest
+    env_file:
+      - .env
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - DATA_DIR=/home/stepfunctions
+    ports:
+      - 8083:8083
+    dns:
+      # Set the DNS server to be the LocalStack container
+      - 10.0.2.20
+    networks:
+      - ls
+  localstack:
+    image: localstack/localstack:latest
+    environment:
+      - SERVICES=sqs,s3,dynamodb,secretsmanager
+      - AWS_DEFAULT_REGION=eu-west-1
+      - DEBUG=${DEBUG:-0}
+      # - ENFORCE_IAM=1 # FUTURE POSSIBILITY enforce IAM policies
+      - BOOTSTRAP_SCRIPT=/etc/localstack/localstack_bootstrap.sh
+    env_file:
+      - .env
+    ports:
+      # Now only required if you need to access LocalStack from the host
+      - "127.0.0.1:4566:4566"            
+      # Now only required if you need to access LocalStack from the host
+      - "127.0.0.1:4510-4559:4510-4559"
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./test-definition.json:/opt/code/localstack/test-definition.json"
+      - "./bootstrap/localstack_bootstrap.py:/etc/localstack/init/ready.d/localstack_bootstrap.py"
+    networks:
+      ls:
+        # Set the container IP address in the 10.0.2.0/24 subnet
+        ipv4_address: 10.0.2.20
+  test-runner:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      target: tests
+    volumes:
+      - ./tests:/app/app
+      - ./bootstrap:/boot
+    env_file:
+      - .env
+    environment:
+      - WAITING_FOR=UTILITIES
+    dns:
+      # Set the DNS server to be the LocalStack container
+      - 10.0.2.20
+    networks:
+      - ls
+    entrypoint: ["/bin/sh", "-c", "python /boot/wait-for-queue.py && ls -l app/ && python app/poll_queue.py"]
+  localapp:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      target: localapp
+    volumes:
+      - ./app:/app/app
+      - ./bootstrap:/boot
+    env_file:
+      - .env
+    environment:
+      - WAITING_FOR=UTILITIES
+    dns:
+      # Set the DNS server to be the LocalStack container
+      - 10.0.2.20
+    networks:
+      - ls
+    entrypoint: ["/bin/sh", "-c", "python /boot/wait-for-queue.py && ls -l /app/app && python /app/app/main.py"]
+  utilities:
+    # FUTURE POSSIBILITY IF SERVICES SET UP
+    # image: 529500773544.dkr.ecr.eu-west-1.amazonaws.com/utilities:latest
+    image: utilities:1.0
+    env_file:
+      - .env
+    environment:
+      - WAITING_FOR=QUEUE
+      - AWS_SHARED_CREDENTIALS_FILE=/root/.aws/credentials
+    volumes:
+      - ./bootstrap:/boot
+    dns:
+      # Set the DNS server to be the LocalStack container
+      - 10.0.2.20
+    networks:
+      - ls
+    ports:
+      - 8000:5000
+    entrypoint: ["/bin/sh", "-c", "python /boot/wait-for-queue.py && uvicorn app.app:app --host 0.0.0.0 --port 5000"]
+
+networks:
+  ls:
+    ipam:
+      config:
+        # Specify the subnet range for IP address allocation
+        - subnet: 10.0.2.0/24

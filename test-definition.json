@@ -1,0 +1,69 @@
+{
+  "Comment": "A Hello World example of the Amazon States Language using a Pass state",
+  "StartAt": "local_app",
+  "States": {
+    "local_app": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Parameters": {
+        "QueueUrl.$": "$.local_app_queue_url",
+        "MessageBody": {
+          "execution_id.$": "$$.Execution.Id",
+          "execution_name.$": "$$.Execution.Name",
+          "state_name.$": "$$.State.Name",
+          "task_token.$": "$$.Task.Token",
+          "payload": "Hello, World!"
+        }
+      },
+      "ResultPath": "$.local_app",
+      "Next": "ingest_adv_sec_data"
+    },
+    "ingest_adv_sec_data": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "schedule_d_7_b_1",
+          "States": {
+            "schedule_d_7_b_1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+              "TimeoutSeconds": 600,
+              "End": true,
+              "Parameters": {
+                "QueueUrl.$": "$.queue_url",
+                "MessageBody": {
+                  "type": "v1/call_sec_api",
+                  "execution_id.$": "$$.Execution.Id",
+                  "execution_name.$": "$$.Execution.Name",
+                  "state_name.$": "$$.State.Name",
+                  "task_token.$": "$$.Task.Token",
+                  "parameters": {
+                    "s3_bucket.$": "$.s3_bucket",
+                    "endpoint": "schedule-d-7-b-1",
+                    "crd.$": "$.CRD"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.ingest_adv_sec_data",
+      "Next": "run_tests"
+    },
+    "run_tests": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Parameters": {
+        "QueueUrl.$": "$.run_tests_queue_url",
+        "MessageBody": {
+          "execution_id.$": "$$.Execution.Id",
+          "execution_name.$": "$$.Execution.Name",
+          "state_name.$": "$$.State.Name",
+          "task_token.$": "$$.Task.Token"
+        }
+      },
+      "End": true
+    }
+  }
+}
